@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <script>
-        // --- プレビュー環境(Iframe)特有の Selection 範囲エラーを根本から100%防ぐ防衛パッチ ---
+        // --- プレビュー環境(Iframe)特有 of Selection 範囲エラーを根本から100%防ぐ防衛パッチ ---
         try {
             const originalGetRangeAt = Selection.prototype.getRangeAt;
             Selection.prototype.getRangeAt = function(index) {
@@ -253,7 +253,7 @@
                         </div>
 
                         <div class="flex space-x-2">
-                            <button id="btn-save-webhook" class="flex-1 px-4 py-2 bg-slate-750 hover:bg-slate-655 text-white text-xs font-semibold rounded-lg transition duration-200 flex items-center justify-center gap-1.5 font-sans font-semibold">
+                            <button id="btn-save-webhook" class="flex-1 px-4 py-2 bg-slate-755 hover:bg-slate-650 text-white text-xs font-semibold rounded-lg transition duration-200 flex items-center justify-center gap-1.5 font-sans">
                                 <i data-lucide="save" class="w-4 h-4"></i>
                                 設定を保存
                             </button>
@@ -294,7 +294,7 @@
                         </h2>
                         <button id="btn-clear-log" class="text-xs text-slate-400 hover:text-white transition font-sans font-medium">クリア</button>
                     </div>
-                    <div id="log-box" class="bg-slate-950 rounded-lg p-3 h-48 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1.5 border border-slate-800 font-medium">
+                    <div id="log-box" class="bg-slate-950 rounded-lg p-3 h-48 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1.5 border border-slate-800" style="max-height: 400px; white-space: pre;">
                         <div>[SYSTEM] 監視システムが起動しました。</div>
                     </div>
                 </div>
@@ -356,7 +356,7 @@
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p>© 2026 MC Update Notifier Panel. Powered by GitHub API.</p>
             <div class="flex space-x-4">
-                <a href="https://github.com/GeyserMC/Geyser" target="_blank" class="hover:text-slate-300 transition font-medium font-sans">GeyserMC Github</a>
+                <a href="https://github.com/GeyserMC/Geyser" target="_blank" class="hover:text-slate-300 transition font-medium font-sans font-bold">GeyserMC Github</a>
             </div>
         </div>
     </footer>
@@ -368,11 +368,11 @@
                 <i data-lucide="alert-triangle" class="w-6 h-6"></i>
                 <h3 class="text-md font-bold text-white font-sans font-bold">確認が必要です</h3>
             </div>
-            <p id="confirm-modal-message" class="text-xs text-slate-300 leading-relaxed mb-6">
+            <p id="confirm-modal-message" class="text-xs text-slate-300 leading-relaxed mb-6 font-sans">
                 本当にこの操作を実行しますか？
             </p>
             <div class="flex justify-end gap-2 text-xs font-semibold font-sans">
-                <button id="btn-confirm-cancel" class="px-4 py-2 bg-slate-750 hover:bg-slate-700 text-slate-200 rounded-lg transition font-sans">
+                <button id="btn-confirm-cancel" class="px-4 py-2 bg-slate-755 hover:bg-slate-700 text-slate-200 rounded-lg transition font-sans">
                     キャンセル
                 </button>
                 <button id="btn-confirm-ok" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition font-sans font-bold">
@@ -384,12 +384,12 @@
 
     <!-- Firebase / アプリメインスクリプト -->
     <script>
-        // --- プレビュー環境(Iframe)特有の Selection 範囲エラーを根本から100%防ぐ防衛パッチ ---
+        // --- プレビュー環境(Iframe)特有 of Selection 範囲エラーを根本から100%防ぐ防衛パッチ ---
         try {
             const originalGetRangeAt = Selection.prototype.getRangeAt;
             Selection.prototype.getRangeAt = function(index) {
                 if (this.rangeCount === 0 || index >= this.rangeCount) {
-                    // エラーを吐かずに安全に空のRangeオブジェクトを作成して返却する
+                    // エラーを吐かずに安全に空 of Rangeオブジェクトを作成して返却する
                     return document.createRange();
                 }
                 return originalGetRangeAt.apply(this, arguments);
@@ -735,7 +735,9 @@
 
         // --- 6. Discord Webhook送信 ---
         async function sendDiscordWebhook(repoName, version, releaseUrl, releaseBody, isTest = false) {
-            const webhookUrl = document.getElementById('webhook-url').value.trim();
+            const webhookUrlEl = document.getElementById('webhook-url');
+            if (!webhookUrlEl) return;
+            const webhookUrl = webhookUrlEl.value.trim();
             if (!webhookUrl) return;
 
             const maxDescLength = 800;
@@ -1118,7 +1120,7 @@
         // --- 9. 共有・同期・Firebase SDK の操作ロジック ---
         async function startHostSharing() {
             if (!isFirebaseValid || !auth || !auth.currentUser) {
-                showToast("クラウド同期用のFirebase設定がされていません。「Firebase Config」を設定して保存してください。", true);
+                showToast("クラウド同期用のFirebaseが正しく準備できていません。", true);
                 return;
             }
 
@@ -1270,7 +1272,36 @@
             }, intervalMs);
         }
 
-        // --- 10. Node.js 用コード自動生成 ---
+        // --- 10. 通知設定ステータス表示の更新処理 (★復元した修正ポイント) ---
+        function updateNotificationStatusUI() {
+            const statusText = document.getElementById('notification-status-text');
+            const btn = document.getElementById('btn-request-notification');
+
+            if (!statusText || !btn) return;
+
+            if (!('Notification' in window)) {
+                statusText.innerHTML = `<i data-lucide="alert-triangle" class="w-3 h-3 text-red-400"></i> <span class="text-red-400">非対応ブラウザです</span>`;
+                btn.disabled = true;
+                return;
+            }
+
+            if (Notification.permission === 'granted') {
+                statusText.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i> <span class="text-emerald-400">通知許可済み</span>`;
+                btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> 許可されています`;
+                btn.className = "px-3 py-1.5 bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-default";
+                btn.disabled = true;
+            } else if (Notification.permission === 'denied') {
+                statusText.innerHTML = `<i data-lucide="x-circle" class="w-3 h-3 text-red-400"></i> <span class="text-red-400">通知ブロック中</span>`;
+                btn.innerHTML = `<i data-lucide="slash" class="w-3.5 h-3.5"></i> ブロックされました`;
+                btn.className = "px-3 py-1.5 bg-red-900/40 text-red-300 text-xs font-semibold rounded-lg cursor-not-allowed";
+                btn.disabled = true;
+            } else {
+                statusText.innerHTML = `<i data-lucide="info" class="w-3 h-3 text-slate-400"></i> <span class="text-slate-400">未設定（推奨）</span>`;
+            }
+            lucide.createIcons();
+        }
+
+        // --- 11. Node.js 用コード自動生成 ---
         function renderNodeJsCode() {
             const container = document.getElementById('node-code-block');
             if (!container) return;
@@ -1286,11 +1317,11 @@ const https = require('https');
 const fs = require('fs');
 
 const DISCORD_WEBHOOK_URL = "YOUR_DISCORD_WEBHOOK_URL_HERE";
-const GITHUB_TOKEN = "${githubToken || 'YOUR_GITHUB_TOKEN_HERE'}";
+const GITHUB_TOKEN = "\${githubToken || 'YOUR_GITHUB_TOKEN_HERE'}";
 const CHECK_INTERVAL = 3600000;
 const CACHE_FILE = './mc_notifier_cache.json';
 
-const TARGET_REPOS = ${reposJson};
+const TARGET_REPOS = \${reposJson};
 
 let savedState = {};
 if (fs.existsSync(CACHE_FILE)) {
@@ -1305,7 +1336,7 @@ function httpRequest(url) {
     return new Promise((resolve, reject) => {
         const headers = { 'User-Agent': 'MC-Update-Watcher-NodeJS' };
         if (GITHUB_TOKEN && GITHUB_TOKEN !== "YOUR_GITHUB_TOKEN_HERE") {
-            headers['Authorization'] = \`token \${GITHUB_TOKEN}\`;
+            headers['Authorization'] = \\\`token \\\${GITHUB_TOKEN}\\\`;
         }
         
         const options = { headers };
@@ -1320,9 +1351,9 @@ function httpRequest(url) {
 }
 
 async function fetchLatestCommit(repoPath) {
-    const res = await httpRequest(\`https://api.github.com/repos/\${repoPath}/commits\`);
+    const res = await httpRequest(\\\`https://api.github.com/repos/\\\${repoPath}/commits\\\`);
     if (res.statusCode !== 200) {
-        throw new Error(\`GitHub APIエラー: ステータス \${res.statusCode}\`);
+        throw new Error(\\\`GitHub APIエラー: ステータス \\\${res.statusCode}\\\`);
     }
     const commits = JSON.parse(res.body);
     if (!commits || commits.length === 0) {
@@ -1330,7 +1361,7 @@ async function fetchLatestCommit(repoPath) {
     }
     const latest = commits[0];
     return {
-        tag_name: \`commit-\${latest.sha.substring(0, 7)}\`,
+        tag_name: \\\`commit-\\\${latest.sha.substring(0, 7)}\\\`,
         html_url: latest.html_url,
         published_at: latest.commit.committer.date,
         body: latest.commit.message
@@ -1339,21 +1370,21 @@ async function fetchLatestCommit(repoPath) {
 
 async function fetchGitHubLatestRelease(repoPath, type = "releases") {
     try {
-        const resRepo = await httpRequest(\`https://api.github.com/repos/\${repoPath}\`);
+        const resRepo = await httpRequest(\\\`https://api.github.com/repos/\\\${repoPath}\\\`);
         if (resRepo.statusCode !== 200) {
-            throw new Error(\`リポジトリが存在しないか、非公開です (ステータス: \${resRepo.statusCode})\`);
+            throw new Error(\\\`リポジトリが存在しないか、非公開です (ステータス: \\\${resRepo.statusCode})\\\`);
         }
 
         if (type === "commits") {
             return await fetchLatestCommit(repoPath);
         }
 
-        const resLatest = await httpRequest(\`https://api.github.com/repos/\${repoPath}/releases/latest\`);
+        const resLatest = await httpRequest(\\\`https://api.github.com/repos/\\\${repoPath}/releases/latest\\\`);
         if (resLatest.statusCode === 200) {
             return JSON.parse(resLatest.body);
         }
 
-        const resAllReleases = await httpRequest(\`https://api.github.com/repos/\${repoPath}/releases\`);
+        const resAllReleases = await httpRequest(\\\`https://api.github.com/repos/\\\${repoPath}/releases\\\`);
         if (resAllReleases.statusCode === 200) {
             const releases = JSON.parse(resAllReleases.body);
             if (releases && releases.length > 0) {
@@ -1361,13 +1392,13 @@ async function fetchGitHubLatestRelease(repoPath, type = "releases") {
             }
         }
 
-        const resTags = await httpRequest(\`https://api.github.com/repos/\${repoPath}/tags\`);
+        const resTags = await httpRequest(\\\`https://api.github.com/repos/\\\${repoPath}/tags\\\`);
         if (resTags.statusCode === 200) {
             const tags = JSON.parse(resTags.body);
             if (tags && tags.length > 0) {
                 return {
                     tag_name: tags[0].name,
-                    html_url: \`https://github.com/\${repoPath}/releases/tag/\${tags[0].name}\`,
+                    html_url: \\\`https://github.com/\\\${repoPath}/releases/tag/\\\${tags[0].name}\\\`,
                     published_at: new Date().toISOString(),
                     body: "タグ情報から取得されました。"
                 };
@@ -1387,8 +1418,8 @@ function sendDiscordNotification(repoName, version, releaseUrl, releaseBody) {
 
     const payload = JSON.stringify({
         embeds: [{
-            title: \`🔔 【\${repoName}】 のアップデートが公開されました！\`,
-            description: \`**検出バージョン:** \\\`\${version}\\\`\\n\\n**変更内容:**\\n\${cleanBody}\`,
+            title: \\\`🔔 【\\\${repoName}】 のアップデートが公開されました！\\\`,
+            description: \\\`**検出バージョン:** \\\\\\\`\\\${version}\\\\\\\`\\\\n\\\\n**変更内容:**\\\\n\\\${cleanBody}\\\`,
             url: releaseUrl,
             color: 3066993,
             timestamp: new Date().toISOString(),
@@ -1413,7 +1444,7 @@ function sendDiscordNotification(repoName, version, releaseUrl, releaseBody) {
 }
 
 async function checkUpdates() {
-    console.log(\`[\${new Date().toLocaleTimeString()}] 自動アップデートチェック開始...\`);
+    console.log(\\\`[\\\${new Date().toLocaleTimeString()}] 自動アップデートチェック開始...\\\`);
     let changed = false;
 
     for (const repo of TARGET_REPOS) {
@@ -1427,13 +1458,13 @@ async function checkUpdates() {
                 savedState[repo.name] = latestTag;
                 changed = true;
             } else if (savedState[repo.name] !== latestTag) {
-                console.log(\`[UPDATE] \${repo.displayName} に更新が検出されました!\`);
+                console.log(\\\`[UPDATE] \\\${repo.displayName} に更新が検出されました!\\\`);
                 sendDiscordNotification(repo.displayName, latestTag, releaseUrl, releaseBody);
                 savedState[repo.name] = latestTag;
                 changed = true;
             }
         } catch (error) {
-            console.error(\`[ERR] \${repo.displayName} の取得エラー:\`, error.message);
+            console.error(\\\`[ERR] \\\${repo.displayName} の取得エラー:\\\`, error.message);
         }
     }
 
@@ -1448,10 +1479,10 @@ async function checkUpdates() {
 
 checkUpdates();
 setInterval(checkUpdates, CHECK_INTERVAL);
-console.log(\`[SYS] MC Update Watcher 起動。\`);`;
+console.log(\\\`[SYS] MC Update Watcher 起動。\\\`);`;
         }
 
-        // --- 11. スタートアップ時処理 ---
+        // --- 12. スタートアップ時処理 ---
         function startApp() {
             // 最優先でローカルリポジトリをロード (Firebaseの初期化に関わらず、画面にカードを描画する)
             loadLocalRepos();
@@ -1460,6 +1491,27 @@ console.log(\`[SYS] MC Update Watcher 起動。\`);`;
             renderRepoManagementList();
             renderStatusCards();
             
+            // Webhook URL と GitHub Token をブラウザの倉庫から安全に復活させる（★追加した修正ポイント）
+            try {
+                const webhookUrlEl = document.getElementById('webhook-url');
+                const savedWebhook = localStorage.getItem(LOCAL_STORAGE_WEBHOOK_KEY);
+                if (webhookUrlEl && savedWebhook) {
+                    webhookUrlEl.value = savedWebhook;
+                }
+
+                const tokenEl = document.getElementById('github-token');
+                const savedToken = localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY);
+                if (tokenEl && savedToken) {
+                    tokenEl.value = savedToken;
+                    githubToken = savedToken; // 内部のプログラム変数にもセット
+                }
+            } catch (e) {
+                console.warn("Webhook URL or Token restore failed:", e);
+            }
+
+            // 初回起動時の通知許可状態をUIに自動適用する（★追加した修正ポイント）
+            updateNotificationStatusUI();
+
             // 【最重要】Firebase接続や認証を一切待たずに、すぐにGitHubからのアプデ取得を開始！ (フリーズ完全防止)
             performUpdateCheck(false);
             resetAutoCheckTimer();
@@ -1498,7 +1550,7 @@ console.log(\`[SYS] MC Update Watcher 起動。\`);`;
             }
         }
 
-        // --- 12. 各種イベント登録に対する安全ガード ---
+        // --- 13. 各種イベント登録に対する安全ガード ---
         const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
         if (btnConfirmCancel) {
             btnConfirmCancel.addEventListener('click', () => {
@@ -1646,33 +1698,6 @@ console.log(\`[SYS] MC Update Watcher 起動。\`);`;
                     performUpdateCheck(true); 
                 } catch (e) {
                     showToast("Tokenの保存に失敗しました。", true);
-                }
-            });
-        }
-
-        const btnSaveFirebase = document.getElementById('btn-save-firebase');
-        if (btnSaveFirebase) {
-            btnSaveFirebase.addEventListener('click', () => {
-                const configInputEl = document.getElementById('firebase-config-input');
-                if (!configInputEl) return;
-                const configInput = configInputEl.value.trim();
-                try {
-                    if (configInput) {
-                        JSON.parse(configInput);
-                        localStorage.setItem(LOCAL_STORAGE_FIREBASE_KEY, configInput);
-                        addLog(`[SYSTEM] Firebase 接続設定を保存しました。反映には再起動（リロード）が必要です。`);
-                        showToast("接続設定を保存しました！リロード後に有効になります。");
-                        
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 3000);
-                    } else {
-                        localStorage.removeItem(LOCAL_STORAGE_FIREBASE_KEY);
-                        showToast("設定をクリアしました。");
-                        addLog(`[SYSTEM] Firebase 接続設定をクリアしました。`);
-                    }
-                } catch (e) {
-                    showToast("JSONの形式が正しくありません。FirebaseコンソールからコピーしたConfig文字列をそのまま貼り付けてください。", true);
                 }
             });
         }
