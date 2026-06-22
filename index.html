@@ -2,6 +2,30 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <script>
+        // --- プレビュー環境(Iframe)特有の Selection 範囲エラーを根本から100%防ぐ防衛パッチ ---
+        try {
+            const originalGetRangeAt = Selection.prototype.getRangeAt;
+            Selection.prototype.getRangeAt = function(index) {
+                if (this.rangeCount === 0 || index >= this.rangeCount) {
+                    // エラーを吐かずに安全に空のRangeオブジェクトを作成して返却する
+                    return document.createRange();
+                }
+                return originalGetRangeAt.apply(this, arguments);
+            };
+        } catch (e) {
+            console.warn("Selection prototype patch failed safely:", e);
+        }
+
+        // グローバルでのその他Selection範囲エラーもイベントキャッチして安全に無視
+        window.addEventListener('error', function(e) {
+            if (e.message && (e.message.includes('getRangeAt') || e.message.includes('Selection'))) {
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+            }
+        }, true);
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minecraft Server Tool Update Watcher</title>
     <!-- Tailwind CSS (CDN) -->
@@ -65,7 +89,7 @@
                 <div class="flex items-center gap-3 text-red-400 mb-4 pb-3 border-b border-slate-700">
                     <i data-lucide="alert-octagon" class="w-8 h-8 animate-bounce text-red-500"></i>
                     <div>
-                        <h3 class="text-lg font-bold text-white font-sans">導入済みプラグインの更新を検知！</h3>
+                        <h3 class="text-lg font-bold text-white font-sans">導入済みプラグイン of 更新を検知！</h3>
                         <p class="text-xs text-red-300">サーバー運用に影響する可能性があります</p>
                     </div>
                 </div>
@@ -98,7 +122,7 @@
             <!-- 左カラム：設定 & 操作パネル & リポジトリ管理 -->
             <div class="space-y-6 lg:col-span-1">
                 
-                <!-- 【新機能】 リアルタイム共有管理カード -->
+                <!-- 【新機能】 リアルタイム同期共有 -->
                 <div class="bg-slate-800/50 border border-indigo-500/30 rounded-xl p-6 backdrop-blur-sm shadow-lg shadow-indigo-500/5 font-sans">
                     <h2 class="text-md font-bold text-white mb-3 flex items-center gap-2">
                         <i data-lucide="share-2" class="w-4 h-4 text-indigo-400 animate-pulse"></i>
@@ -112,17 +136,17 @@
                         </div>
 
                         <div id="share-action-area" class="space-y-2">
-                            <button id="btn-start-share" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5">
+                            <button id="btn-start-share" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 font-sans">
                                 <i data-lucide="link"></i>
                                 共有部屋を作成 (同期開始)
                             </button>
                         </div>
 
-                        <div id="share-info-area" class="space-y-2 hidden">
+                        <div id="share-info-area" class="space-y-2 hidden font-sans">
                             <label class="block text-[11px] text-slate-400">このURLを友達や仲間に共有してください：</label>
                             <div class="flex gap-2">
-                                <input type="text" id="share-url-input" readonly class="flex-grow bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-indigo-300 focus:outline-none select-all font-mono">
-                                <button id="btn-copy-share" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 rounded text-xs font-bold transition duration-200 flex items-center justify-center gap-1 shrink-0">
+                                <input type="text" id="share-url-input" readonly class="flex-grow bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-indigo-300 focus:outline-none font-mono">
+                                <button id="btn-copy-share" class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 rounded text-xs font-bold transition duration-200 flex items-center justify-center gap-1 shrink-0 font-sans">
                                     <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                                     コピー
                                 </button>
@@ -186,8 +210,24 @@
                             通知・API制限対策設定
                         </h2>
 
+                        <!-- Vercel同期共有用：Firebase Config 設定 -->
+                        <div id="firebase-setting-box" class="p-4 bg-slate-900/60 rounded-lg border border-slate-800 space-y-2 mb-4">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
+                                    <i data-lucide="database" class="w-3.5 h-3.5 text-indigo-400"></i>
+                                    Firebase Config (共有用)
+                                </h3>
+                                <span class="text-[9px] bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-500/20">Vercel用</span>
+                            </div>
+                            <p class="text-[10px] text-slate-400">Vercel等の外部サイトで共有機能を使う場合に、ご自身のFirebase設定(JSON)を貼り付けて保存してください。</p>
+                            <textarea id="firebase-config-input" rows="4" placeholder='{"apiKey": "...", "authDomain": "...", "projectId": "...", "storageBucket": "...", "messagingSenderId": "...", "appId": "..."}' class="w-full bg-slate-850 border border-slate-700 rounded px-2 py-1.5 text-[10px] text-white focus:outline-none focus:border-emerald-500 font-mono"></textarea>
+                            <button id="btn-save-firebase" class="w-full py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold rounded transition font-sans">
+                                Firebase設定を保存
+                            </button>
+                        </div>
+
                         <!-- API制限対策：GitHub Token -->
-                        <div id="token-setting-box" class="p-4 bg-slate-900/60 rounded-lg border border-slate-800 space-y-2 mb-4">
+                        <div id="token-setting-box" class="p-4 bg-slate-900/60 rounded-lg border border-slate-800 space-y-2 mb-4 font-sans font-medium">
                             <div class="flex items-center justify-between">
                                 <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
                                     <i data-lucide="key-round" class="w-3.5 h-3.5 text-blue-400"></i>
@@ -197,7 +237,7 @@
                             </div>
                             <p class="text-[11px] text-slate-400">入力すると制限が1時間5,000回に大幅アップし、更新エラーが起きなくなります。</p>
                             <input type="password" id="github-token" placeholder="ghp_XXXXXXXXXXXXXXXXXXXX" class="w-full bg-slate-850 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
-                            <button id="btn-save-token" class="w-full py-1 bg-slate-700 hover:bg-slate-655 text-white text-[11px] font-semibold rounded transition">
+                            <button id="btn-save-token" class="w-full py-1 bg-slate-700 hover:bg-slate-655 text-white text-[11px] font-semibold rounded transition font-sans">
                                 トークンを保存
                             </button>
                         </div>
@@ -221,7 +261,7 @@
                     </div>
 
                     <!-- Discord Webhook設定 -->
-                    <div id="webhook-setting-box" class="space-y-4 pt-4 border-t border-slate-700/60 font-sans font-medium">
+                    <div id="webhook-setting-box" class="space-y-4 pt-4 border-t border-slate-700/60">
                         <div>
                             <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Discord Webhook URL</label>
                             <input type="password" id="webhook-url" placeholder="https://discord.com/api/webhooks/..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
@@ -229,11 +269,11 @@
                         </div>
 
                         <div class="flex space-x-2">
-                            <button id="btn-save-webhook" class="flex-1 px-4 py-2 bg-slate-750 hover:bg-slate-650 text-white text-xs font-semibold rounded-lg transition duration-200 flex items-center justify-center gap-1.5">
+                            <button id="btn-save-webhook" class="flex-1 px-4 py-2 bg-slate-750 hover:bg-slate-650 text-white text-xs font-semibold rounded-lg transition duration-200 flex items-center justify-center gap-1.5 font-sans">
                                 <i data-lucide="save" class="w-4 h-4"></i>
                                 設定を保存
                             </button>
-                            <button id="btn-test-webhook" class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-500/30 transition duration-200 flex items-center justify-center gap-1.5 font-sans">
+                            <button id="btn-test-webhook" class="px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs font-semibold rounded-lg border border-emerald-500/30 transition duration-200 flex items-center justify-center gap-1.5 font-sans font-bold">
                                 <i data-lucide="send" class="w-4 h-4"></i>
                                 テスト送信
                             </button>
@@ -270,7 +310,7 @@
                         </h2>
                         <button id="btn-clear-log" class="text-xs text-slate-400 hover:text-white transition font-sans font-medium">クリア</button>
                     </div>
-                    <div id="log-box" class="bg-slate-950 rounded-lg p-3 h-48 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1.5 border border-slate-800">
+                    <div id="log-box" class="bg-slate-950 rounded-lg p-3 h-48 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1.5 border border-slate-800 font-medium">
                         <div>[SYSTEM] 監視システムが起動しました。</div>
                     </div>
                 </div>
@@ -282,7 +322,7 @@
                 
                 <!-- タブメニュー -->
                 <div class="flex border-b border-slate-700/80">
-                    <button id="tab-status" class="px-5 py-3 border-b-2 border-emerald-500 text-emerald-400 font-bold text-sm transition duration-200 flex items-center gap-2 font-sans">
+                    <button id="tab-status" class="px-5 py-3 border-b-2 border-emerald-500 text-emerald-400 font-bold text-sm transition duration-200 flex items-center gap-2 font-sans font-bold">
                         <i data-lucide="activity" class="w-4 h-4"></i>
                         ステータス監視
                     </button>
@@ -304,19 +344,19 @@
                     <div class="bg-slate-800/50 border border-slate-700/60 rounded-xl p-6 font-sans">
                         <div class="flex items-center justify-between mb-4">
                             <div>
-                                <h3 class="text-md font-bold text-white flex items-center gap-2">
+                                <h3 class="text-md font-bold text-white flex items-center gap-2 font-sans">
                                     <i data-lucide="terminal" class="w-4 h-4 text-emerald-400"></i>
                                     24時間監視用 Node.js スクリプト
                                 </h3>
-                                <p class="text-xs text-slate-400 mt-1">Linux / Windows Serverなどでcronやpm2を使って自動化する場合のスクリプトです。</p>
+                                <p class="text-xs text-slate-400 mt-1">Linux / Windows Serverなどでcron or pm2を使って自動化する場合のスクリプトです。</p>
                             </div>
-                            <button id="btn-copy-code" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-655 text-white text-xs font-semibold rounded-lg transition duration-200 flex items-center gap-1.5 font-sans">
+                            <button id="btn-copy-code" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-655 text-white text-xs font-semibold rounded-lg transition duration-200 flex items-center gap-1.5 font-sans font-medium">
                                 <i data-lucide="copy" class="w-4 h-4"></i>
                                 <span>コピーする</span>
                             </button>
                         </div>
 
-                        <div id="node-code-block" class="bg-slate-900/80 rounded-lg p-4 font-mono text-xs text-slate-300 overflow-x-auto border border-slate-800 select-all" style="max-height: 400px; white-space: pre;">
+                        <div id="node-code-block" class="bg-slate-900/80 rounded-lg p-4 font-mono text-xs text-slate-300 overflow-x-auto border border-slate-800" style="max-height: 400px; white-space: pre;">
                         </div>
                     </div>
                 </div>
@@ -328,11 +368,11 @@
     </main>
 
     <!-- フッター -->
-    <footer class="bg-slate-950 border-t border-slate-800 py-6 text-center text-xs text-slate-500 mt-12 font-sans">
+    <footer class="bg-slate-950 border-t border-slate-800 py-6 text-center text-xs text-slate-500 mt-12 font-sans font-medium">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p>© 2026 MC Update Notifier Panel. Powered by GitHub API.</p>
             <div class="flex space-x-4">
-                <a href="https://github.com/GeyserMC/Geyser" target="_blank" class="hover:text-slate-300 transition font-medium">GeyserMC Github</a>
+                <a href="https://github.com/GeyserMC/Geyser" target="_blank" class="hover:text-slate-300 transition font-medium font-sans">GeyserMC Github</a>
             </div>
         </div>
     </footer>
@@ -348,10 +388,10 @@
                 本当にこの操作を実行しますか？
             </p>
             <div class="flex justify-end gap-2 text-xs font-semibold font-sans">
-                <button id="btn-confirm-cancel" class="px-4 py-2 bg-slate-750 hover:bg-slate-700 text-slate-200 rounded-lg transition">
+                <button id="btn-confirm-cancel" class="px-4 py-2 bg-slate-750 hover:bg-slate-700 text-slate-200 rounded-lg transition font-sans">
                     キャンセル
                 </button>
-                <button id="btn-confirm-ok" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition font-sans">
+                <button id="btn-confirm-ok" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition font-sans font-bold">
                     確定する
                 </button>
             </div>
@@ -359,26 +399,75 @@
     </div>
 
     <!-- Firebase / アプリメインスクリプト -->
+    <script>
+        // --- プレビュー環境(Iframe)特有の Selection 範囲エラーを根本から100%防ぐ防衛パッチ ---
+        try {
+            const originalGetRangeAt = Selection.prototype.getRangeAt;
+            Selection.prototype.getRangeAt = function(index) {
+                if (this.rangeCount === 0 || index >= this.rangeCount) {
+                    // エラーを吐かずに安全に空のRangeオブジェクトを作成して返却する
+                    return document.createRange();
+                }
+                return originalGetRangeAt.apply(this, arguments);
+            };
+        } catch (e) {
+            console.warn("Selection prototype patch failed safely:", e);
+        }
+
+        // グローバルでのその他Selection範囲エラーもイベントキャッチして安全に無視
+        window.addEventListener('error', function(e) {
+            if (e.message && (e.message.includes('getRangeAt') || e.message.includes('Selection'))) {
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+            }
+        }, true);
+    </script>
     <script type="module">
         // Firebase Core & Firestore SDK のインポート
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- ユーザーが提供したデフォルトのFirebase設定 (最初から組み込み) ---
+        const defaultFirebaseConfig = {
+            apiKey: "AIzaSyAMOh6MvFF6U1M5dlaVJRXDhRmfPc3N51A",
+            authDomain: "sei-update.firebaseapp.com",
+            projectId: "sei-update",
+            storageBucket: "sei-update.firebasestorage.app",
+            messagingSenderId: "603544679417",
+            appId: "1:603544679417:web:9b9b2477a8557f9a108328",
+            measurementId: "G-JFZCD3G7CV"
+        };
+
         // --- Firebase 安全起動ガード設計 ---
         let app, auth, db, appId;
         let isFirebaseValid = false;
         
-        // プレビュー環境での Firebase グローバル変数の遅延・未定義クラッシュを防ぐ自動保護機構
         try {
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                const firebaseConfig = JSON.parse(__firebase_config);
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                appId = typeof __app_id !== 'undefined' ? __app_id : 'mc-watcher-app';
-                isFirebaseValid = true;
+            // 最優先でCanvasのシステム変数 __firebase_config を確認。無ければローカル保存された設定、それも無ければ埋め込みのデフォルトを使用
+            let activeConfig = defaultFirebaseConfig;
+            
+            // ローカルストレージにカスタムConfigが保存されているかチェック
+            try {
+                const savedCustomConfig = localStorage.getItem("mc_updater_firebase_config");
+                if (savedCustomConfig) {
+                    activeConfig = JSON.parse(savedCustomConfig);
+                }
+            } catch (e) {
+                console.warn("Saved custom config check failed safely:", e);
             }
+
+            // Canvasシステム環境変数を最優先
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                activeConfig = JSON.parse(__firebase_config);
+            }
+
+            app = initializeApp(activeConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            appId = typeof __app_id !== 'undefined' ? __app_id : activeConfig.projectId || 'sei-update';
+            isFirebaseValid = true;
         } catch (firebaseInitError) {
             console.warn("Firebase の初期化に失敗しました。ダミー環境でスタンドアロン動作します:", firebaseInitError);
         }
@@ -397,6 +486,7 @@
         const LOCAL_STORAGE_VERSION_KEY = "mc_updater_known_versions";
         const LOCAL_STORAGE_REPOS_KEY = "mc_updater_monitored_repos";
         const LOCAL_STORAGE_TOKEN_KEY = "mc_updater_github_token";
+        const LOCAL_STORAGE_FIREBASE_KEY = "mc_updater_firebase_config";
 
         // デフォルトのリポジトリ設定
         const DEFAULT_REPOS = [
@@ -405,7 +495,7 @@
             { id: "floodgate", displayName: "Floodgate", path: "GeyserMC/Floodgate", type: "commits", installed: false, desc: "統合版ユーザーがJava版ログインをスキップして接続できるようにする拡張" }
         ];
 
-        // --- 1. ユーティリティ・ログ・トースト（Hoisting不整合を完全防御するため上部定義） ---
+        // --- 1. ユーティリティ・ログ・トースト ---
         function addLog(text) {
             const logBox = document.getElementById('log-box');
             if (!logBox) return;
@@ -452,7 +542,40 @@
             modal.classList.remove('hidden');
         }
 
-        // --- 2. データの安全ロード・書き込み (IframeのlocalStorage制限完全防御設計) ---
+        // --- 2. 安全なコピークリップボード関数 (IndexSizeError/Selection 競合を完全防御) ---
+        async function safeCopyText(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (err) {
+                    console.warn("navigator.clipboard.writeText failed, using fallback:", err);
+                }
+            }
+
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-99999px";
+            textArea.style.top = "0px";
+            document.body.appendChild(textArea);
+            
+            try {
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return successful;
+            } catch (err) {
+                console.error("Fallback copy execution failed:", err);
+                if (document.body.contains(textArea)) {
+                    document.body.removeChild(textArea);
+                }
+                return false;
+            }
+        }
+
+        // --- 3. データの安全ロード・書き込み (IframeのlocalStorage制限防御) ---
         function loadLocalRepos() {
             try {
                 const savedRepos = localStorage.getItem(LOCAL_STORAGE_REPOS_KEY);
@@ -478,7 +601,7 @@
             }
         }
 
-        // --- 3. データ取得・GitHub API 連携 ---
+        // --- 4. データ取得・GitHub API 連携 ---
         async function fetchGitHubAPI(url) {
             const headers = { 'Accept': 'application/vnd.github.v3+json' };
             if (githubToken) {
@@ -515,7 +638,6 @@
             const cacheKey = `mc_updater_cache_api_${repo.path}_${repo.type}`;
             const cached = localStorage.getItem(cacheKey);
 
-            // 5分間のキャッシュ有効
             if (!forceRefresh && cached) {
                 try {
                     const cacheObj = JSON.parse(cached);
@@ -617,7 +739,7 @@
             return resultData;
         }
 
-        // --- 4. 導入済みプラグイン用の「緊急モーダル」表示（一括実行関数 performUpdateCheck から参照されるため、先に定義します） ---
+        // --- 5. 導入済みプラグイン用の「緊急モーダル」表示 ---
         function triggerEmergencyAlertModal(repoId, name, version, url, body) {
             const modalName = document.getElementById('alert-modal-name');
             const modalVer = document.getElementById('alert-modal-ver');
@@ -629,18 +751,16 @@
             if (modalDesc) modalDesc.textContent = body || "更新の詳細はGitHubページからご確認ください。";
             if (goBtn) goBtn.href = url;
 
-            // モーダル表示
             const updateAlertModal = document.getElementById('update-alert-modal');
             if (updateAlertModal) {
                 updateAlertModal.classList.remove('hidden');
             }
 
-            // バッジのUIも強制アップデート警告に変更
             const badgeAlert = document.getElementById(`badge-alert-${repoId}`);
             if (badgeAlert) badgeAlert.classList.remove('hidden');
         }
 
-        // --- 5. Discord Webhook送信 ---
+        // --- 6. Discord Webhook送信 ---
         async function sendDiscordWebhook(repoName, version, releaseUrl, releaseBody, isTest = false) {
             const webhookUrl = document.getElementById('webhook-url').value.trim();
             if (!webhookUrl) return;
@@ -695,7 +815,7 @@
             sendDiscordWebhook(name, version, url, rawBody);
         }
 
-        // --- 6. アップデートチェックの一括実行 ---
+        // --- 7. アップデートチェックの一括実行 ---
         async function performUpdateCheck(forceRefresh = false) {
             if (monitoredRepos.length === 0) return;
 
@@ -789,7 +909,7 @@
             }
         }
 
-        // --- 7. UI レンダリング構築 ＆ 同期コントロール ---
+        // --- 8. UI レンダリング構築 ＆ 同期コントロール ---
         function renderRepoManagementList() {
             const container = document.getElementById('repo-list-container');
             if (!container) return;
@@ -972,40 +1092,60 @@
                     const toggleBtn = document.getElementById(`btn-toggle-install-${repo.id}`);
                     const badgeInstalled = document.getElementById(`badge-installed-${repo.id}`);
                     
-                    toggleBtn.addEventListener('click', () => {
-                        repo.installed = !repo.installed;
-                        
-                        if (repo.installed) {
-                            toggleBtn.className = "w-10 h-6 flex items-center rounded-full p-1 duration-300 cursor-pointer bg-emerald-500 justify-end";
-                            badgeInstalled.classList.remove('hidden');
-                            card.classList.remove('border-slate-700/50');
-                            card.classList.add('border-emerald-600/60', 'bg-emerald-950/5');
-                            addLog(`[SYSTEM] ${repo.displayName} を「サーバー導入済み」に設定しました。`);
-                            showToast(`「${repo.displayName}」を導入済みにしました！`);
-                        } else {
-                            toggleBtn.className = "w-10 h-6 flex items-center rounded-full p-1 duration-300 cursor-pointer bg-slate-700 justify-start";
-                            badgeInstalled.classList.add('hidden');
-                            document.getElementById(`badge-alert-${repo.id}`).classList.add('hidden');
-                            card.classList.add('border-slate-700/50');
-                            card.classList.remove('border-emerald-600/60', 'bg-emerald-950/5');
-                            addLog(`[SYSTEM] ${repo.displayName} の「導入済み」を解除しました。`);
-                        }
+                    if (toggleBtn) {
+                        toggleBtn.addEventListener('click', () => {
+                            repo.installed = !repo.installed;
+                            
+                            if (repo.installed) {
+                                toggleBtn.className = "w-10 h-6 flex items-center rounded-full p-1 duration-300 cursor-pointer bg-emerald-500 justify-end";
+                                if (badgeInstalled) badgeInstalled.classList.remove('hidden');
+                                card.classList.remove('border-slate-700/50');
+                                card.classList.add('border-emerald-600/60', 'bg-emerald-950/5');
+                                addLog(`[SYSTEM] ${repo.displayName} を「サーバー導入済み」に設定しました。`);
+                                showToast(`「${repo.displayName}」を導入済みにしました！`);
+                            } else {
+                                toggleBtn.className = "w-10 h-6 flex items-center rounded-full p-1 duration-300 cursor-pointer bg-slate-700 justify-start";
+                                if (badgeInstalled) badgeInstalled.classList.add('hidden');
+                                const badAlertEl = document.getElementById(`badge-alert-${repo.id}`);
+                                if (badAlertEl) badAlertEl.classList.add('hidden');
+                                card.classList.add('border-slate-700/50');
+                                card.classList.remove('border-emerald-600/60', 'bg-emerald-950/5');
+                                addLog(`[SYSTEM] ${repo.displayName} の「導入済み」を解除しました。`);
+                            }
 
-                        saveLocalRepos();
-                        renderRepoManagementList();
-                        
-                        // クラウド共有同期
-                        syncReposToCloud();
-                    });
+                            saveLocalRepos();
+                            renderRepoManagementList();
+                            
+                            // クラウド共有同期
+                            syncReposToCloud();
+                        });
+                    }
                 }
             });
             lucide.createIcons();
         }
 
-        // --- 8. 共有・同期・Firebase SDK の操作ロジック ---
+        // 実際の削除処理を実行する関数
+        function executeRemoveRepo(index) {
+            const target = monitoredRepos[index];
+            showConfirm(`「${target.displayName}」の監視を停止してよろしいですか？`, () => {
+                addLog(`[SYSTEM] 監視対象から「${target.displayName}」を削除しました。`);
+                monitoredRepos.splice(index, 1);
+                saveLocalRepos();
+                renderRepoManagementList();
+                renderStatusCards();
+                performUpdateCheck(false);
+                showToast("監視対象を削除しました");
+                
+                // クラウド共有同期
+                syncReposToCloud();
+            });
+        }
+
+        // --- 9. 共有・同期・Firebase SDK の操作ロジック ---
         async function startHostSharing() {
             if (!isFirebaseValid || !auth || !auth.currentUser) {
-                showToast("スタンドアロン環境で動作しているため、同期共有部屋を作成できません。", true);
+                showToast("クラウド同期用のFirebase設定がされていません。「Firebase Config」を設定して保存してください。", true);
                 return;
             }
 
@@ -1139,7 +1279,9 @@
 
         function resetAutoCheckTimer() {
             if (checkTimer) clearInterval(checkTimer);
-            const intervalMs = parseInt(document.getElementById('check-interval').value);
+            const checkIntervalEl = document.getElementById('check-interval');
+            if (!checkIntervalEl) return;
+            const intervalMs = parseInt(checkIntervalEl.value);
             const nextTime = new Date(Date.now() + intervalMs);
             const nextCheckEl = document.getElementById('next-check-time');
             if (nextCheckEl) {
@@ -1153,144 +1295,6 @@
                     nextCheckEl.textContent = `次回自動チェック: ${newNextTime.toLocaleTimeString()}`;
                 }
             }, intervalMs);
-        }
-
-        // --- 9. リポジトリの追加・プリセット・通知送信 ---
-        document.getElementById('btn-add-repo').addEventListener('click', () => {
-            const display = document.getElementById('new-repo-display').value.trim();
-            const path = document.getElementById('new-repo-path').value.trim();
-            const type = document.getElementById('new-repo-type').value;
-
-            if (!display || !path) {
-                showToast("表示名とGitHubリポジトリパスを入力してください。", true);
-                return;
-            }
-
-            if (!path.includes('/')) {
-                showToast("リポジトリパスは 'owner/repo' の形式で入力してください。", true);
-                return;
-            }
-
-            const id = "custom_" + Date.now();
-            const newRepo = { 
-                id, 
-                displayName: display, 
-                path, 
-                type,
-                installed: false,
-                desc: "手動で追加されたカスタムリポジトリ" 
-            };
-
-            monitoredRepos.push(newRepo);
-            saveLocalRepos();
-
-            document.getElementById('new-repo-display').value = '';
-            document.getElementById('new-repo-path').value = '';
-
-            addLog(`[SYSTEM] 監視対象に「${display} (${path})」を追加しました。`);
-            showToast("リポジトリを追加しました！");
-
-            renderRepoManagementList();
-            renderStatusCards();
-            performUpdateCheck(true); 
-
-            // クラウド共有同期
-            syncReposToCloud();
-        });
-
-        document.getElementById('btn-reset-preset').addEventListener('click', () => {
-            if (isGuestMode) return;
-            showConfirm("監視リストを初期設定に戻しますか？（追加したカスタムリポジトリはリセットされます）", () => {
-                monitoredRepos = [...DEFAULT_REPOS];
-                saveLocalRepos();
-                addLog("[SYSTEM] 監視対象リストを初期設定にリセットしました。");
-                showToast("リストを初期化しました");
-                renderRepoManagementList();
-                renderStatusCards();
-                performUpdateCheck(true); // 強制取得
-
-                // クラウド共有同期
-                syncReposToCloud();
-            });
-        });
-
-        document.getElementById('btn-save-webhook').addEventListener('click', () => {
-            const url = document.getElementById('webhook-url').value.trim();
-            try {
-                localStorage.setItem(LOCAL_STORAGE_WEBHOOK_KEY, url);
-                showToast("Webhook設定を保存しました。");
-                addLog(`[SYSTEM] Webhookの設定が保存されました。`);
-            } catch (e) {
-                showToast("設定の保存に失敗しました。", true);
-            }
-        });
-
-        document.getElementById('btn-test-webhook').addEventListener('click', () => {
-            sendDiscordWebhook("テスト", "1.0.0-TEST", "https://github.com", "これはテストメッセージです。正しくWebhookが機能しています！", true);
-        });
-
-        document.getElementById('btn-save-token').addEventListener('click', () => {
-            const token = document.getElementById('github-token').value.trim();
-            githubToken = token;
-            try {
-                localStorage.setItem(LOCAL_STORAGE_TOKEN_KEY, token);
-                addLog(`[SYSTEM] GitHub Tokenを設定・保存しました。今後は制限が大幅に緩和されます。`);
-                showToast("Tokenを保存しました！");
-                performUpdateCheck(true); 
-            } catch (e) {
-                showToast("Tokenの保存に失敗しました。", true);
-            }
-        });
-
-        document.getElementById('btn-request-notification').addEventListener('click', async () => {
-            if (!('Notification' in window)) {
-                showToast("このブラウザは通知に対応していません。", true);
-                return;
-            }
-            const permission = await Notification.requestPermission();
-            updateNotificationStatusUI();
-            if (permission === 'granted') {
-                showToast("デスクトップ通知が許可されました！");
-                addLog("[SYSTEM] デスクトップ通知が許可されました。");
-                new Notification("通知設定 完了", {
-                    body: "MC Update Watcher からのテスト通知です。",
-                    icon: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/2705.png"
-                });
-            } else {
-                showToast("通知が拒否されました。", true);
-            }
-        });
-
-        document.getElementById('btn-clear-log').addEventListener('click', () => {
-            document.getElementById('log-box').innerHTML = `<div>[SYSTEM] ログがクリアされました。</div>`;
-        });
-
-        function updateNotificationStatusUI() {
-            const statusText = document.getElementById('notification-status-text');
-            const btn = document.getElementById('btn-request-notification');
-
-            if (!statusText || !btn) return;
-
-            if (!('Notification' in window)) {
-                statusText.innerHTML = `<i data-lucide="alert-triangle" class="w-3 h-3 text-red-400"></i> <span class="text-red-400">非対応ブラウザです</span>`;
-                btn.disabled = true;
-                return;
-            }
-
-            if (Notification.permission === 'granted') {
-                statusText.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i> <span class="text-emerald-400">通知許可済み</span>`;
-                btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> 許可されています`;
-                btn.className = "px-3 py-1.5 bg-slate-700 text-white text-xs font-semibold rounded-lg cursor-default";
-                btn.disabled = true;
-            } else if (Notification.permission === 'denied') {
-                statusText.innerHTML = `<i data-lucide="x-circle" class="w-3 h-3 text-red-400"></i> <span class="text-red-400">通知ブロック中</span>`;
-                btn.innerHTML = `<i data-lucide="slash" class="w-3.5 h-3.5"></i> ブロックされました`;
-                btn.className = "px-3 py-1.5 bg-red-900/40 text-red-300 text-xs font-semibold rounded-lg cursor-not-allowed";
-                btn.disabled = true;
-            } else {
-                statusText.innerHTML = `<i data-lucide="info" class="w-3 h-3 text-slate-400"></i> <span class="text-slate-400">未設定（推奨）</span>`;
-            }
-            lucide.createIcons();
         }
 
         // --- 10. Node.js 用コード自動生成 ---
@@ -1415,7 +1419,7 @@ function sendDiscordNotification(repoName, version, releaseUrl, releaseBody) {
             url: releaseUrl,
             color: 3066993,
             timestamp: new Date().toISOString(),
-            footer: { text: "MC Update Watcher Bot" }
+            footer: { text: "Minecraft Update Watcher Bot" }
         }]
     });
 
@@ -1474,33 +1478,56 @@ setInterval(checkUpdates, CHECK_INTERVAL);
 console.log(\`[SYS] MC Update Watcher 起動。\`);`;
         }
 
-        // --- 11. スタートアップ時処理 (最下部で評価、確実に定義済みの関数を起動) ---
+        // --- 11. スタートアップ時処理 ---
         function startApp() {
-            // 最優先でローカルリポジトリをロード
+            // 最優先でローカルリポジトリをロード (Firebaseの初期化に関わらず、画面にカードを描画する)
             loadLocalRepos();
             
             // 画面を最優先でレンダリング
             renderRepoManagementList();
             renderStatusCards();
             
-            // Firebase接続や認証を一切待たずに、すぐにGitHubからのアプデ取得を開始！
+            // Firebase Configの設定テキストをインプット欄に復元
+            try {
+                const configInputEl = document.getElementById('firebase-config-input');
+                const customConfig = localStorage.getItem(LOCAL_STORAGE_FIREBASE_KEY);
+                if (configInputEl && customConfig) {
+                    configInputEl.value = customConfig;
+                } else if (configInputEl) {
+                    // 何も保存されていなければデフォルトConfigを表示
+                    configInputEl.value = JSON.stringify(defaultFirebaseConfig, null, 2);
+                }
+            } catch(e) {}
+
+            // 【最重要】Firebase接続や認証を一切待たずに、すぐにGitHubからのアプデ取得を開始！ (フリーズ完全防止)
             performUpdateCheck(false);
             resetAutoCheckTimer();
             
             // Firebaseはバックグラウンドで並行して安全に初期化
             if (isFirebaseValid && auth) {
                 try {
-                    onAuthStateChanged(auth, async (user) => {
-                        if (user) {
-                            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                            const shareId = hashParams.get('share');
-
-                            if (shareId) {
-                                isGuestMode = true;
-                                activeSessionId = shareId;
-                                setupGuestSync(shareId);
-                            }
+                    // Firebase認証処理 (RULE 3 遵守)
+                    const initAuthAndSync = async () => {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
                         }
+                    };
+
+                    initAuthAndSync().then(() => {
+                        onAuthStateChanged(auth, async (user) => {
+                            if (user) {
+                                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                                const shareId = hashParams.get('share');
+
+                                if (shareId) {
+                                    isGuestMode = true;
+                                    activeSessionId = shareId;
+                                    setupGuestSync(shareId);
+                                }
+                            }
+                        });
                     });
                 } catch (e) {
                     console.warn("Background Auth handling failed safely:", e);
@@ -1508,6 +1535,278 @@ console.log(\`[SYS] MC Update Watcher 起動。\`);`;
             } else {
                 addLog("[SYSTEM] スタンドアロン動作（ローカルモード）で情報を監視します。");
             }
+        }
+
+        // --- 12. 各種イベント登録に対する安全ガード ---
+        const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
+        if (btnConfirmCancel) {
+            btnConfirmCancel.addEventListener('click', () => {
+                const modal = document.getElementById('confirm-modal');
+                if (modal) modal.classList.add('hidden');
+                confirmCallback = null;
+            });
+        }
+
+        const btnConfirmOk = document.getElementById('btn-confirm-ok');
+        if (btnConfirmOk) {
+            btnConfirmOk.addEventListener('click', () => {
+                const modal = document.getElementById('confirm-modal');
+                if (modal) modal.classList.add('hidden');
+                if (confirmCallback) confirmCallback();
+                confirmCallback = null;
+            });
+        }
+
+        const btnAlertClose = document.getElementById('btn-alert-close');
+        if (btnAlertClose) {
+            btnAlertClose.addEventListener('click', () => {
+                const modal = document.getElementById('update-alert-modal');
+                if (modal) modal.classList.add('hidden');
+            });
+        }
+
+        const btnStartShare = document.getElementById('btn-start-share');
+        if (btnStartShare) {
+            btnStartShare.addEventListener('click', () => {
+                startHostSharing();
+            });
+        }
+
+        const btnCopyShare = document.getElementById('btn-copy-share');
+        if (btnCopyShare) {
+            btnCopyShare.addEventListener('click', () => {
+                copyShareUrl();
+            });
+        }
+
+        const btnAddRepo = document.getElementById('btn-add-repo');
+        if (btnAddRepo) {
+            btnAddRepo.addEventListener('click', () => {
+                const displayEl = document.getElementById('new-repo-display');
+                const pathEl = document.getElementById('new-repo-path');
+                const typeEl = document.getElementById('new-repo-type');
+                if (!displayEl || !pathEl || !typeEl) return;
+
+                const display = displayEl.value.trim();
+                const path = pathEl.value.trim();
+                const type = typeEl.value;
+
+                if (!display || !path) {
+                    showToast("表示名とGitHubリポジトリパスを入力してください。", true);
+                    return;
+                }
+
+                if (!path.includes('/')) {
+                    showToast("リポジトリパスは 'owner/repo' の形式で入力してください。", true);
+                    return;
+                }
+
+                const id = "custom_" + Date.now();
+                const newRepo = { 
+                    id, 
+                    displayName: display, 
+                    path, 
+                    type,
+                    installed: false,
+                    desc: "手動で追加されたカスタムリポジトリ" 
+                };
+
+                monitoredRepos.push(newRepo);
+                saveLocalRepos();
+
+                displayEl.value = '';
+                pathEl.value = '';
+
+                addLog(`[SYSTEM] 監視対象に「${display} (${path})」を追加しました。`);
+                showToast("リポジトリを追加しました！");
+
+                renderRepoManagementList();
+                renderStatusCards();
+                performUpdateCheck(true); 
+
+                // クラウド共有同期
+                syncReposToCloud();
+            });
+        }
+
+        const btnResetPreset = document.getElementById('btn-reset-preset');
+        if (btnResetPreset) {
+            btnResetPreset.addEventListener('click', () => {
+                if (isGuestMode) return;
+                showConfirm("監視リストを初期設定に戻しますか？（追加したカスタムリポジトリはリセットされます）", () => {
+                    monitoredRepos = [...DEFAULT_REPOS];
+                    saveLocalRepos();
+                    addLog("[SYSTEM] 監視対象リストを初期設定にリセットしました。");
+                    showToast("リストを初期化しました");
+                    renderRepoManagementList();
+                    renderStatusCards();
+                    performUpdateCheck(true); // 強制取得
+
+                    // クラウド共有同期
+                    syncReposToCloud();
+                });
+            });
+        }
+
+        const btnSaveWebhook = document.getElementById('btn-save-webhook');
+        if (btnSaveWebhook) {
+            btnSaveWebhook.addEventListener('click', () => {
+                const webhookUrlEl = document.getElementById('webhook-url');
+                if (!webhookUrlEl) return;
+                const url = webhookUrlEl.value.trim();
+                try {
+                    localStorage.setItem(LOCAL_STORAGE_WEBHOOK_KEY, url);
+                    showToast("Webhook設定を保存しました。");
+                    addLog(`[SYSTEM] Webhookの設定が保存されました。`);
+                } catch (e) {
+                    showToast("設定の保存に失敗しました。", true);
+                }
+            });
+        }
+
+        const btnTestWebhook = document.getElementById('btn-test-webhook');
+        if (btnTestWebhook) {
+            btnTestWebhook.addEventListener('click', () => {
+                sendDiscordWebhook("テスト", "1.0.0-TEST", "https://github.com", "これはテストメッセージです。正しくWebhookが機能しています！", true);
+            });
+        }
+
+        const btnSaveToken = document.getElementById('btn-save-token');
+        if (btnSaveToken) {
+            btnSaveToken.addEventListener('click', () => {
+                const tokenEl = document.getElementById('github-token');
+                if (!tokenEl) return;
+                const token = tokenEl.value.trim();
+                try {
+                    githubToken = token;
+                    localStorage.setItem(LOCAL_STORAGE_TOKEN_KEY, token);
+                    addLog(`[SYSTEM] GitHub Tokenを設定・保存しました。今後は制限が大幅に緩和されます。`);
+                    showToast("Tokenを保存しました！");
+                    performUpdateCheck(true); 
+                } catch (e) {
+                    showToast("Tokenの保存に失敗しました。", true);
+                }
+            });
+        }
+
+        const btnSaveFirebase = document.getElementById('btn-save-firebase');
+        if (btnSaveFirebase) {
+            btnSaveFirebase.addEventListener('click', () => {
+                const configInputEl = document.getElementById('firebase-config-input');
+                if (!configInputEl) return;
+                const configInput = configInputEl.value.trim();
+                try {
+                    if (configInput) {
+                        JSON.parse(configInput);
+                        localStorage.setItem(LOCAL_STORAGE_FIREBASE_KEY, configInput);
+                        addLog(`[SYSTEM] Firebase 接続設定を保存しました。反映には再起動（リロード）が必要です。`);
+                        showToast("接続設定を保存しました！リロード後に有効になります。");
+                        
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 3000);
+                    } else {
+                        localStorage.removeItem(LOCAL_STORAGE_FIREBASE_KEY);
+                        showToast("設定をクリアしました。");
+                        addLog(`[SYSTEM] Firebase 接続設定をクリアしました。`);
+                    }
+                } catch (e) {
+                    showToast("JSONの形式が正しくありません。FirebaseコンソールからコピーしたConfig文字列をそのまま貼り付けてください。", true);
+                }
+            });
+        }
+
+        const btnRequestNotification = document.getElementById('btn-request-notification');
+        if (btnRequestNotification) {
+            btnRequestNotification.addEventListener('click', async () => {
+                if (!('Notification' in window)) {
+                    showToast("このブラウザは通知に対応していません。", true);
+                    return;
+                }
+                const permission = await Notification.requestPermission();
+                updateNotificationStatusUI();
+                if (permission === 'granted') {
+                    showToast("デスクトップ通知が許可されました！");
+                    addLog("[SYSTEM] デスクトップ通知が許可されました。");
+                    new Notification("通知設定 完了", {
+                        body: "MC Update Watcher からのテスト通知です。",
+                        icon: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/2705.png"
+                    });
+                } else {
+                    showToast("通知が拒否されました。", true);
+                }
+            });
+        }
+
+        const btnClearLog = document.getElementById('btn-clear-log');
+        if (btnClearLog) {
+            btnClearLog.addEventListener('click', () => {
+                const logBox = document.getElementById('log-box');
+                if (logBox) logBox.innerHTML = `<div>[SYSTEM] ログがクリアされました。</div>`;
+            });
+        }
+
+        const tabStatus = document.getElementById('tab-status');
+        if (tabStatus) {
+            tabStatus.addEventListener('click', () => {
+                const tabNodejs = document.getElementById('tab-nodejs');
+                const contentStatus = document.getElementById('content-status');
+                const contentNodejs = document.getElementById('content-nodejs');
+                if (tabNodejs && contentStatus && contentNodejs) {
+                    tabStatus.className = "px-5 py-3 border-b-2 border-emerald-500 text-emerald-400 font-bold text-sm transition duration-200 flex items-center gap-2";
+                    tabNodejs.className = "px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm transition duration-200 flex items-center gap-2";
+                    contentStatus.classList.remove('hidden');
+                    contentNodejs.classList.add('hidden');
+                }
+            });
+        }
+
+        const tabNodejs = document.getElementById('tab-nodejs');
+        if (tabNodejs) {
+            tabNodejs.addEventListener('click', () => {
+                const tabStatus = document.getElementById('tab-status');
+                const contentStatus = document.getElementById('content-status');
+                const contentNodejs = document.getElementById('content-nodejs');
+                if (tabStatus && contentStatus && contentNodejs) {
+                    tabNodejs.className = "px-5 py-3 border-b-2 border-emerald-500 text-emerald-400 font-bold text-sm transition duration-200 flex items-center gap-2";
+                    tabStatus.className = "px-5 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-sm transition duration-200 flex items-center gap-2";
+                    contentNodejs.classList.remove('hidden');
+                    contentStatus.classList.add('hidden');
+                    renderNodeJsCode();
+                }
+            });
+        }
+
+        const btnCopyCode = document.getElementById('btn-copy-code');
+        if (btnCopyCode) {
+            btnCopyCode.addEventListener('click', () => {
+                const codeElem = document.getElementById('node-code-block');
+                if (codeElem) {
+                    safeCopyText(codeElem.innerText).then((success) => {
+                        if (success) {
+                            showToast("コードをクリップボードにコピーしました！");
+                        } else {
+                            showToast("コピーに失敗しました", true);
+                        }
+                    });
+                }
+            });
+        }
+
+        const checkInterval = document.getElementById('check-interval');
+        if (checkInterval) {
+            checkInterval.addEventListener('change', () => {
+                addLog(`[SYSTEM] 自動チェック間隔を変更しました。`);
+                resetAutoCheckTimer();
+            });
+        }
+
+        const btnCheckNow = document.getElementById('btn-check-now');
+        if (btnCheckNow) {
+            btnCheckNow.addEventListener('click', () => {
+                performUpdateCheck(true); 
+                resetAutoCheckTimer();
+            });
         }
 
         // 即座に初期化を起動
