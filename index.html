@@ -8,7 +8,7 @@
             const originalGetRangeAt = Selection.prototype.getRangeAt;
             Selection.prototype.getRangeAt = function(index) {
                 if (this.rangeCount === 0 || index >= this.rangeCount) {
-                    // エラーを吐かずに安全に空のRangeオブジェクトを作成して返却する
+                    // エラーを吐かずに安全に空 of Rangeオブジェクトを作成して返却する
                     return document.createRange();
                 }
                 return originalGetRangeAt.apply(this, arguments);
@@ -211,7 +211,7 @@
                         </h2>
 
                         <!-- API制限対策：GitHub Token -->
-                        <div id="token-setting-box" class="p-4 bg-slate-900/60 rounded-lg border border-slate-800 space-y-2 mb-4 font-sans font-medium">
+                        <div id="token-setting-box" class="p-4 bg-slate-900/60 rounded-lg border border-slate-800 space-y-2 mb-4">
                             <div class="flex items-center justify-between">
                                 <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
                                     <i data-lucide="key-round" class="w-3.5 h-3.5 text-blue-400"></i>
@@ -245,7 +245,7 @@
                     </div>
 
                     <!-- Discord Webhook設定 -->
-                    <div id="webhook-setting-box" class="space-y-4 pt-4 border-t border-slate-700/60">
+                    <div id="webhook-setting-box" class="space-y-4 pt-4 border-t border-slate-700/60 font-sans font-medium">
                         <div>
                             <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Discord Webhook URL</label>
                             <input type="password" id="webhook-url" placeholder="https://discord.com/api/webhooks/..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
@@ -294,7 +294,7 @@
                         </h2>
                         <button id="btn-clear-log" class="text-xs text-slate-400 hover:text-white transition font-sans font-medium">クリア</button>
                     </div>
-                    <div id="log-box" class="bg-slate-950 rounded-lg p-3 h-48 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1.5 border border-slate-800" style="max-height: 400px; white-space: pre;">
+                    <div id="log-box" class="bg-slate-950 rounded-lg p-3 h-48 overflow-y-auto font-mono text-[11px] text-slate-300 space-y-1.5 border border-slate-800 font-medium">
                         <div>[SYSTEM] 監視システムが起動しました。</div>
                     </div>
                 </div>
@@ -356,7 +356,7 @@
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p>© 2026 MC Update Notifier Panel. Powered by GitHub API.</p>
             <div class="flex space-x-4">
-                <a href="https://github.com/GeyserMC/Geyser" target="_blank" class="hover:text-slate-300 transition font-medium font-sans font-bold">GeyserMC Github</a>
+                <a href="https://github.com/GeyserMC/Geyser" target="_blank" class="hover:text-slate-300 transition font-medium font-sans">GeyserMC Github</a>
             </div>
         </div>
     </footer>
@@ -399,6 +399,16 @@
         }
 
         // グローバルでのその他Selection範囲エラーもイベントキャッチして安全に無視
+        window.addEventListener('error', function(e) {
+            if (e.message && (e.message.includes('getRangeAt') || e.message.includes('Selection'))) {
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+            }
+        }, true);
+    </script>
+    <script type="module font-sans">
+        // グローバルでの Selection 範囲エラーをキャッチし安全に無視するハンドラー (プレビュー・Iframeの競合ブロック対策)
         window.addEventListener('error', function(e) {
             if (e.message && (e.message.includes('getRangeAt') || e.message.includes('Selection'))) {
                 e.preventDefault();
@@ -479,6 +489,39 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
+        // 安全なコピークリップボード関数
+        async function safeCopyText(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (err) {
+                    console.warn("navigator.clipboard.writeText failed, using fallback:", err);
+                }
+            }
+
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-99999px";
+            textArea.style.top = "0px";
+            document.body.appendChild(textArea);
+            
+            try {
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return successful;
+            } catch (err) {
+                console.error("Fallback copy execution failed:", err);
+                if (document.body.contains(textArea)) {
+                    document.body.removeChild(textArea);
+                }
+                return false;
+            }
+        }
+
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toast-message');
@@ -513,39 +556,6 @@
             modalMsg.textContent = message;
             confirmCallback = onConfirm;
             modal.classList.remove('hidden');
-        }
-
-        // --- 2. 安全なコピークリップボード関数 (IndexSizeError/Selection 競合を完全防御) ---
-        async function safeCopyText(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                try {
-                    await navigator.clipboard.writeText(text);
-                    return true;
-                } catch (err) {
-                    console.warn("navigator.clipboard.writeText failed, using fallback:", err);
-                }
-            }
-
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-99999px";
-            textArea.style.top = "0px";
-            document.body.appendChild(textArea);
-            
-            try {
-                textArea.focus();
-                textArea.select();
-                const successful = document.execCommand('copy');
-                document.body.removeChild(textArea);
-                return successful;
-            } catch (err) {
-                console.error("Fallback copy execution failed:", err);
-                if (document.body.contains(textArea)) {
-                    document.body.removeChild(textArea);
-                }
-                return false;
-            }
         }
 
         // --- 3. データの安全ロード・書き込み (IframeのlocalStorage制限防御) ---
@@ -749,7 +759,7 @@
                 embeds: [{
                     title: isTest ? `🔧 【テスト】 アップデート通知テスト` : `🔔 【${repoName}】 の更新が公開されました！`,
                     description: isTest ? 
-                        "テスト通知の送信に成功しました。このチャンネル宛てにGeyserMCなどの最新アプデ情報が届くようになります。" : 
+                        "テスト通知 of 送信に成功しました。このチャンネル宛てにGeyserMCなどの最新アプデ情報が届くようになります。" : 
                         `**バージョン/ハッシュ:** \`${version}\`\n\n**更新・コミット詳細:**\n${cleanBody}`,
                     url: isTest ? "https://github.com" : releaseUrl,
                     color: 1629828,
@@ -981,13 +991,13 @@
 
                             <div class="text-left md:text-right mt-1 w-full">
                                 <span class="text-[10px] text-slate-400 block font-sans">最新のバージョン / コミット</span>
-                                <div id="ver-${repo.id}" class="text-xl font-black text-emerald-400 font-mono">取得中...</div>
+                                <div id="ver-${repo.id}" class="text-xl font-black text-emerald-400 font-mono font-sans font-bold">取得中...</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- エラー用警告枠 (通常非表示) -->
-                    <div id="err-box-${repo.id}" class="hidden p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-xs text-red-300 my-3 flex items-start gap-2 font-sans">
+                    <div id="err-box-${repo.id}" class="hidden p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-xs text-red-300 my-3 flex items-start gap-2 font-sans font-medium">
                         <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-0.5 text-red-400"></i>
                         <div id="err-text-${repo.id}">
                             取得エラー
@@ -1025,8 +1035,8 @@
                                 <span>更新者: <span id="author-${repo.id}" class="font-semibold text-slate-200">-</span></span>
                             </div>
 
-                            <div class="flex items-center justify-between px-4 py-2 bg-slate-950/20 border-b border-slate-800/40">
-                                <span class="text-[10px] text-slate-500 font-sans" id="cached-indicator-${repo.id}">原文 (英語等)</span>
+                            <div class="flex items-center justify-between px-4 py-2 bg-slate-950/20 border-b border-slate-800/40 font-sans font-medium">
+                                <span class="text-[10px] text-slate-500" id="cached-indicator-${repo.id}">原文 (英語等)</span>
                                 <!-- Google翻訳転送用のプレースホルダー -->
                                 <div id="btn-translate-placeholder-${repo.id}"></div>
                             </div>
@@ -1041,25 +1051,28 @@
                 
                 container.appendChild(card);
 
-                // Google翻訳ボタンの動的生成 (CORSエラー皆無・100%確実に動作)
+                // Google翻訳ボタンの動的生成 (CORSエラー皆無・100%確実に動作するよう、クリック時に安全にhrefをセットするaタグ方式)
                 const placeholder = document.getElementById(`btn-translate-placeholder-${repo.id}`);
                 if (placeholder) {
-                    const transBtn = document.createElement('button');
-                    transBtn.className = "px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-bold rounded flex items-center gap-1 transition font-sans";
-                    transBtn.innerHTML = `<i data-lucide="languages" class="w-3.5 h-3.5"></i> <span>Google翻訳で開く</span>`;
+                    const transLink = document.createElement('a');
+                    transLink.target = "_blank";
+                    transLink.rel = "noopener noreferrer";
+                    transLink.className = "px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-bold rounded flex items-center gap-1 transition font-sans cursor-pointer";
+                    transLink.innerHTML = `<i data-lucide="languages" class="w-3.5 h-3.5"></i> <span>Google翻訳で開く</span>`;
                     
-                    transBtn.addEventListener('click', () => {
+                    transLink.addEventListener('click', (e) => {
                         const originalText = document.getElementById(`body-${repo.id}`).textContent;
                         if (originalText && originalText !== "変更履歴を取得中..." && originalText !== "詳細内容はありません。") {
                             const targetUrl = `https://translate.google.co.jp/?sl=en&tl=ja&text=${encodeURIComponent(originalText)}&op=translate`;
-                            window.open(targetUrl, '_blank');
+                            transLink.href = targetUrl;
                             showToast("Google翻訳を別タブで開きました！");
                         } else {
+                            e.preventDefault(); // 翻訳するものがない場合は遷移を防ぐ
                             showToast("翻訳するコンテンツがありません。", true);
                         }
                     });
                     
-                    placeholder.appendChild(transBtn);
+                    placeholder.appendChild(transLink);
                 }
 
                 // 導入済みトグルボタンのイベントリスナー (ホストのみ実行可能)
@@ -1398,7 +1411,7 @@ async function fetchGitHubLatestRelease(repoPath, type = "releases") {
             if (tags && tags.length > 0) {
                 return {
                     tag_name: tags[0].name,
-                    html_url: \\\`https://github.com/\\\${repoPath}/releases/tag/\\\${tags[0].name}\\\`,
+                    html_url: \`https://github.com/\${repoPath}/releases/tag/\${tags[0].name}\`,
                     published_at: new Date().toISOString(),
                     body: "タグ情報から取得されました。"
                 };
@@ -1419,7 +1432,7 @@ function sendDiscordNotification(repoName, version, releaseUrl, releaseBody) {
     const payload = JSON.stringify({
         embeds: [{
             title: \\\`🔔 【\\\${repoName}】 のアップデートが公開されました！\\\`,
-            description: \\\`**検出バージョン:** \\\\\\\`\\\${version}\\\\\\\`\\\\n\\\\n**変更内容:**\\\\n\\\${cleanBody}\\\`,
+            description: \`**検出バージョン:** \\\\\\\`\\\${version}\\\\\\\`\\\\n\\\\n**変更内容:**\\\\n\\\${cleanBody}\`,
             url: releaseUrl,
             color: 3066993,
             timestamp: new Date().toISOString(),
@@ -1491,7 +1504,7 @@ console.log(\\\`[SYS] MC Update Watcher 起動。\\\`);`;
             renderRepoManagementList();
             renderStatusCards();
             
-            // Webhook URL と GitHub Token をブラウザの倉庫から安全に復活させる（★追加した修正ポイント）
+            // Webhook URL と GitHub Token をブラウザの倉庫から安全に復活させる
             try {
                 const webhookUrlEl = document.getElementById('webhook-url');
                 const savedWebhook = localStorage.getItem(LOCAL_STORAGE_WEBHOOK_KEY);
@@ -1509,7 +1522,7 @@ console.log(\\\`[SYS] MC Update Watcher 起動。\\\`);`;
                 console.warn("Webhook URL or Token restore failed:", e);
             }
 
-            // 初回起動時の通知許可状態をUIに自動適用する（★追加した修正ポイント）
+            // 初回起動時の通知許可状態をUIに自動適用する
             updateNotificationStatusUI();
 
             // 【最重要】Firebase接続や認証を一切待たずに、すぐにGitHubからのアプデ取得を開始！ (フリーズ完全防止)
